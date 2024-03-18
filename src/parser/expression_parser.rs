@@ -136,25 +136,44 @@ export class ExpressionParser extends AbstractParser {
 
  */
 
-    pub struct ExpressionParser {
-        text: Box<str>,
-        position: u64
-    }
+pub struct ExpressionParser {
+    text: Box<str>,
+    position: u64,
+}
 
-    impl ExpressionParser {
-        pub fn parse(text: Box<str>, end_level: u64) {
-            let parser=ExpressionParser{text: text, position: 0 };
-            return parser.parse_normal(end_level);
-        }
-        pub fn parse_normal(&self, end_level: u64) {}
+impl ExpressionParser {
+    pub fn parse(text: Box<str>, end_level: u64)-> Box<dyn crate::nodes::expressions::te_expression::TEExpression> {
+        let parser = ExpressionParser { text: text, position: 0 };
+        return parser.parse_normal(end_level);
     }
+    pub fn parse_normal(&self, end_level: u64)-> Box<dyn crate::nodes::expressions::te_expression::TEExpression> {
+        return Box::new(crate::nodes::expressions::te_variable::TEVariable { name: Box::from("tmp") });
+    }
+}
+use std::any::{Any, TypeId};
 
+trait InstanceOf
+    where
+        Self: Any,
+{
+    fn instance_of<U: ?Sized + Any>(&self) -> bool {
+        TypeId::of::<Self>() == TypeId::of::<U>()
+    }
+}
+
+// implement this trait for every type that implements `Any` (which is most types)
+impl<T: ?Sized + Any> InstanceOf for T {}
 #[cfg(test)]
 mod tests {
+    use std::any::TypeId;
+    use std::ops::Deref;
+    use crate::nodes::expressions::te_variable::TEVariable;
     use super::*;
 
     #[test]
     fn variable() {
-        let obj=ExpressionParser::parse(Box::from("var1"), 0);
+        let obj = ExpressionParser::parse(Box::from("var1"), 0);
+        assert_eq!(obj.get_type().deref(),"TEVariable");
+        assert!(obj.get_type().deref().eq("TEVariable"));
     }
 }
