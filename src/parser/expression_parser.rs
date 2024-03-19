@@ -135,6 +135,9 @@ export class ExpressionParser extends AbstractParser {
 }
 
  */
+use crate::nodes::expressions::te_boolean::TEBoolean;
+use crate::nodes::expressions::te_expression::TEExpression;
+use crate::nodes::expressions::te_variable::TEVariable;
 
 pub struct ExpressionParser {
     text: Box<str>,
@@ -142,30 +145,72 @@ pub struct ExpressionParser {
 }
 
 impl ExpressionParser {
-    pub fn parse(text: Box<str>, end_level: u64)-> Box<dyn crate::nodes::expressions::te_expression::TEExpression> {
-        let parser = ExpressionParser { text: text, position: 0 };
+    pub fn read_untill(&mut self, regexp: Box<str>) -> Box<str> {
+        let mut ret = String::new();
+        while self.position < self.text.len() as u64 {
+            let char = self.text.chars().nth(self.position as usize).unwrap();
+            if regexp.contains(char) {
+                break;
+            }
+            ret.push(char);
+            self.position += 1;
+        }
+        return Box::from(ret);
+    }
+
+    fn skip_whitespace(&mut self) {
+        self.read_untill(Box::from(r"\S"));
+    }
+
+    // fn read_untill_text(&mut self, text: Box<str>) -> Box<str> {
+    //     let mut ret = Box::from("");
+    //     while self.position < self.text.len() as u64 {
+    //         let char = self.text.chars().nth(self.position as usize).unwrap();
+    //         if self.text[self.position as usize..].starts_with(&text) {
+    //             break;
+    //         }
+    //         ret.push(char);
+    //         self.position += 1;
+    //     }
+    //     return ret;
+    // }
+
+    // fn throw(&self, message: Box<str>) {
+    //     let lines = self.text[..self.position as usize].split('\n');
+    //     panic!("MptsParserError: {} at line {}", message, lines.len());
+    // }
+
+    pub fn parse(text: Box<str>, end_level: u64) ->Option<Box<dyn TEExpression>> {
+        let mut parser = ExpressionParser { text: text, position: 0 };
         return parser.parse_normal(end_level);
     }
-    pub fn parse_normal(&self, end_level: u64)-> Box<dyn crate::nodes::expressions::te_expression::TEExpression> {
-        return Box::new(crate::nodes::expressions::te_variable::TEVariable { name: Box::from("tmp") });
+    pub fn parse_normal(&mut self, end_level: u64) -> Option<Box<dyn TEExpression>> {
+        //return Box::new(crate::nodes::expressions::te_variable::TEVariable { name: Box::from("tmp") });
+        let mut lastNode: Option<Box<dyn TEExpression>> = None;
+        while (self.position < self.text.len() as u64) {
+            let char: char = self.text.chars().nth(self.position as usize).unwrap();
+            if char.is_whitespace() {
+                self.position += 1;
+            } else {
+                if (lastNode.is_some()) {
+                    break;
+                }
+                let name = self.read_untill(Box::from("['\"\\(\\)=\\.:\\s>\\+\\-*?]"));
+                if name == Box::from("true") {
+                    lastNode = Option::Some(Box::new(TEBoolean { value: true }));
+                } else if name == Box::from("false") {
+                    lastNode = Option::Some(Box::new(TEBoolean { value: false }));
+                } else {
+                    lastNode = Option::Some(Box::new(TEVariable { name: name }));
+                }
+            }
+        }
+        return lastNode;
     }
 }
-use std::any::{Any, TypeId};
 
-trait InstanceOf
-    where
-        Self: Any,
-{
-    fn instance_of<U: ?Sized + Any>(&self) -> bool {
-        TypeId::of::<Self>() == TypeId::of::<U>()
-    }
-}
-
-// implement this trait for every type that implements `Any` (which is most types)
-impl<T: ?Sized + Any> InstanceOf for T {}
 #[cfg(test)]
 mod tests {
-    use std::any::TypeId;
     use std::ops::Deref;
     use crate::nodes::expressions::te_variable::TEVariable;
     use super::*;
@@ -173,7 +218,8 @@ mod tests {
     #[test]
     fn variable() {
         let obj = ExpressionParser::parse(Box::from("var1"), 0);
-        assert_eq!(obj.get_type().deref(),"TEVariable");
-        assert!(obj.get_type().deref().eq("TEVariable"));
+        assert!(obj.is_some());
+        //assert_eq!(obj.get_type().deref(), "TEVariable");
+        assert_eq!(obj.unwrap().get_type().deref(), "TEVariable");
     }
 }
